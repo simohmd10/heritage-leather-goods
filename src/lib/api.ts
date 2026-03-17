@@ -15,7 +15,6 @@ export const auth = {
     });
     if (error) raise(error);
     if (!data.user) raise('Registration failed — please try again');
-    // Profile is created automatically by the trigger; fetch it
     const profile = await auth.me();
     return { user: profile };
   },
@@ -65,7 +64,6 @@ export const auth = {
   },
 
   changePassword: async (body: { currentPassword: string; newPassword: string }) => {
-    // Re-authenticate first to verify current password
     const { data: { user } } = await supabase.auth.getUser();
     if (!user?.email) raise('Not authenticated');
 
@@ -186,8 +184,6 @@ export const orders = {
     });
 
     if (error) raise(error);
-
-    // Fetch the full order to return
     return orders.get(data.order_number);
   },
 
@@ -265,6 +261,15 @@ export const contact = {
 
 // ─── ADMIN ───────────────────────────────────────────────────────────────────
 export const admin = {
+  /** Lightweight pending orders count — used for nav badge */
+  pendingCount: async (): Promise<number> => {
+    const { count } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
+    return count ?? 0;
+  },
+
   stats: async (): Promise<AdminStats> => {
     const [
       { data: ordersData },
@@ -278,26 +283,45 @@ export const admin = {
 
     const allOrders = ordersData ?? [];
     const allProducts = productsData ?? [];
-
     const validOrders = allOrders.filter(o => o.payment_status !== 'failed');
-    const totalRevenue = validOrders.reduce((s, o) => s + o.total, 0);
-    const pendingOrders = allOrders.filter(o => o.status === 'pending').length;
-    const lowStockProducts = allProducts.filter(p => p.stock_count <= 5).length;
 
-    // Revenue by month (last 6 months)
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    // ── Period boundaries ────────────────────────────────────────────────────
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = new Date(todayStart);
+    weekStart.setDate(weekStart.getDate() - 6);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const revenueByMonth: Record<string, { revenue: number; orders: number }> = {};
-    for (const o of validOrders) {
-      if (new Date(o.created_at) < sixMonthsAgo) continue;
-      const month = o.created_at.slice(0, 7);
-      if (!revenueByMonth[month]) revenueByMonth[month] = { revenue: 0, orders: 0 };
-      revenueByMonth[month].revenue += o.total;
-      revenueByMonth[month].orders += 1;
+    const totalRevenue      = validOrders.reduce((s, o) => s + o.total, 0);
+    const pendingOrders     = allOrders.filter(o => o.status === 'pending').length;
+    const lowStockProducts  = allProducts.filter(p => p.stock_count <= 5).length;
+    const revenueToday      = validOrders.filter(o => new Date(o.created_at) >= todayStart).reduce((s, o) => s + o.total, 0);
+    const revenueThisWeek   = validOrders.filter(o => new Date(o.created_at) >= weekStart).reduce((s, o) => s + o.total, 0);
+    const revenueThisMonth  = validOrders.filter(o => new Date(o.created_at) >= monthStart).reduce((s, o) => s + o.total, 0);
+    const ordersToday       = allOrders.filter(o => new Date(o.created_at) >= todayStart).length;
+    const ordersThisWeek    = allOrders.filter(o => new Date(o.created_at) >= weekStart).length;
+
+    // ── Daily revenue — last 30 days ─────────────────────────────────────────
+    const dayMap: Record<string, { revenue: number; orders: number }> = {};
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(todayStart);
+      d.setDate(d.getDate() - i);
+      dayMap[d.toISOString().slice(0, 10)] = { revenue: 0, orders: 0 };
     }
+    for (const o of validOrders) {
+      const key = o.created_at.slice(0, 10);
+      if (dayMap[key]) {
+        dayMap[key].revenue += o.total;
+        dayMap[key].orders  += 1;
+      }
+    }
+    const revenueByDay = Object.entries(dayMap).map(([date, v]) => ({
+      date,
+      label: new Date(date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      ...v,
+    }));
 
-    // Recent orders (with customer names)
+    // ── Recent orders ────────────────────────────────────────────────────────
     const { data: recentRaw } = await supabase
       .from('orders')
       .select('*, profiles(name), order_items(*)')
@@ -309,7 +333,7 @@ export const admin = {
       customer_name: o.profiles?.name,
     }));
 
-    // Top products
+    // ── Top products ─────────────────────────────────────────────────────────
     const { data: itemsRaw } = await supabase
       .from('order_items')
       .select('product_id, product_name, product_slug, price, quantity');
@@ -319,10 +343,10 @@ export const admin = {
       const key = String(item.product_id);
       if (!productMap[key]) productMap[key] = { product_name: item.product_name, product_slug: item.product_slug, units_sold: 0, revenue: 0 };
       productMap[key].units_sold += item.quantity;
-      productMap[key].revenue += item.price * item.quantity;
+      productMap[key].revenue    += item.price * item.quantity;
     }
     const topProducts = Object.values(productMap)
-      .sort((a, b) => b.units_sold - a.units_sold)
+      .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 5);
 
     return {
@@ -333,19 +357,29 @@ export const admin = {
         totalCustomers: customerCount ?? 0,
         pendingOrders,
         lowStockProducts,
+        revenueToday,
+        revenueThisWeek,
+        revenueThisMonth,
+        ordersToday,
+        ordersThisWeek,
       },
-      revenueByMonth: Object.entries(revenueByMonth)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([month, v]) => ({ month, ...v })),
+      revenueByDay,
       topProducts,
       recentOrders,
     };
   },
 
-  orders: async (params?: { status?: string; page?: number; limit?: number }) => {
-    const page = params?.page ?? 1;
+  orders: async (params?: {
+    status?: string;
+    page?: number;
+    limit?: number;
+    dateFrom?: string;
+    dateTo?: string;
+    search?: string;
+  }) => {
+    const page  = params?.page ?? 1;
     const limit = params?.limit ?? 20;
-    const from = (page - 1) * limit;
+    const from  = (page - 1) * limit;
 
     let q = supabase
       .from('orders')
@@ -353,7 +387,9 @@ export const admin = {
       .order('created_at', { ascending: false })
       .range(from, from + limit - 1);
 
-    if (params?.status) q = q.eq('status', params.status);
+    if (params?.status)   q = q.eq('status', params.status);
+    if (params?.dateFrom) q = q.gte('created_at', params.dateFrom);
+    if (params?.dateTo)   q = q.lte('created_at', params.dateTo + 'T23:59:59');
 
     const { data, error, count } = await q;
     if (error) raise(error);
@@ -413,35 +449,40 @@ export const admin = {
     return { message: 'Product deleted' };
   },
 
-  customers: async (params?: { page?: number; search?: string }) => {
-    const page = params?.page ?? 1;
+  customers: async (params?: { page?: number; search?: string; sortBy?: 'newest' | 'orders' | 'spent' }) => {
+    const page  = params?.page ?? 1;
     const limit = 20;
-    const from = (page - 1) * limit;
+    const from  = (page - 1) * limit;
 
     let q = supabase
       .from('profiles')
       .select('*', { count: 'exact' })
       .eq('role', 'customer')
-      .order('created_at', { ascending: false })
       .range(from, from + limit - 1);
 
     if (params?.search) q = q.ilike('name', `%${params.search}%`);
 
+    // Default sort by newest; other sorts happen client-side after joining order data
+    q = q.order('created_at', { ascending: false });
+
     const { data, error, count } = await q;
     if (error) raise(error);
 
-    // Fetch order stats for each customer
     const customers: Customer[] = await Promise.all(
       (data ?? []).map(async (profile: any) => {
         const { data: orderData } = await supabase
           .from('orders')
           .select('total')
           .eq('user_id', profile.id);
-        const orderCount = orderData?.length ?? 0;
-        const totalSpent = (orderData ?? []).reduce((s: number, o: any) => s + o.total, 0);
-        return { ...profile, order_count: orderCount, total_spent: totalSpent };
+        const order_count = orderData?.length ?? 0;
+        const total_spent = (orderData ?? []).reduce((s: number, o: any) => s + o.total, 0);
+        return { ...profile, order_count, total_spent };
       })
     );
+
+    // Client-side sort
+    if (params?.sortBy === 'orders') customers.sort((a, b) => b.order_count - a.order_count);
+    if (params?.sortBy === 'spent')  customers.sort((a, b) => b.total_spent - a.total_spent);
 
     return { customers, total: count ?? 0 };
   },
@@ -462,9 +503,52 @@ export const admin = {
   },
 };
 
+// ─── CSV EXPORT UTILITY ───────────────────────────────────────────────────────
+export function exportOrdersToCSV(orderList: Order[]) {
+  const headers = [
+    'Order Number', 'Customer', 'Email', 'Date', 'Status',
+    'Payment', 'Subtotal', 'Shipping', 'Tax', 'Total',
+    'City', 'Address', 'Items'
+  ];
+
+  const rows = orderList.map(o => {
+    const addr = o.shipping_address ?? {};
+    const customerName = o.customer_name || o.guest_name || 'Guest';
+    const email = o.guest_email ?? '';
+    const city  = addr.city ?? '';
+    const address = [addr.address, addr.state, addr.zip, addr.country].filter(Boolean).join(', ');
+    const items = (o.items ?? []).map(i => `${i.product_name}×${i.quantity}`).join(' | ');
+
+    return [
+      o.order_number,
+      customerName,
+      email,
+      new Date(o.created_at).toLocaleDateString('en-US'),
+      o.status,
+      o.payment_status,
+      o.subtotal.toFixed(2),
+      o.shipping.toFixed(2),
+      o.tax.toFixed(2),
+      o.total.toFixed(2),
+      city,
+      address,
+      items,
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
+  });
+
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `orders-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 export interface User {
-  id: string;          // UUID in Supabase
+  id: string;
   name: string;
   email: string;
   role: 'admin' | 'customer';
@@ -494,7 +578,7 @@ export interface Order {
   user_id?: string;
   guest_email?: string;
   guest_name?: string;
-  status: 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
   subtotal: number;
   shipping: number;
   tax: number;
@@ -526,6 +610,7 @@ export interface ShippingAddress {
   state: string;
   zip: string;
   country: string;
+  phone?: string;
 }
 
 export interface CreateOrderPayload {
@@ -596,13 +681,18 @@ export interface AdminStats {
     totalCustomers: number;
     pendingOrders: number;
     lowStockProducts: number;
+    revenueToday: number;
+    revenueThisWeek: number;
+    revenueThisMonth: number;
+    ordersToday: number;
+    ordersThisWeek: number;
   };
-  revenueByMonth: Array<{ month: string; revenue: number; orders: number }>;
+  revenueByDay: Array<{ date: string; label: string; revenue: number; orders: number }>;
   topProducts: Array<{ product_name: string; product_slug: string; units_sold: number; revenue: number }>;
   recentOrders: Order[];
 }
 
-// Legacy exports (kept for backward compat with pages that import these)
+// Legacy exports
 export const getToken = () => null;
 export const setToken = (_t: string) => {};
 export const removeToken = () => {};
