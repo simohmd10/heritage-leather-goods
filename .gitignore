@@ -15,6 +15,7 @@ dist-ssr
 # Server data and deps
 server/data/
 server/node_modules/
+server/package-lock.json
 
 # Editor directories and files
 .vscode/*
