@@ -12,10 +12,9 @@ dist
 dist-ssr
 *.local
 
-# Server data and deps
-server/data/
-server/node_modules/
-server/package-lock.json
+# Environment (keep .env.example, ignore actual secrets)
+.env.local
+.env.*.local
 
 # Editor directories and files
 .vscode/*
