@@ -5,7 +5,6 @@ import accessoryImg from "@/assets/product-accessory.jpg";
 
 export interface Product {
   id: string;
-  slug: string;
   name: string;
   price: number;
   category: "wallets" | "bags" | "belts" | "accessories";
@@ -21,7 +20,6 @@ export interface Product {
 export const products: Product[] = [
   {
     id: "classic-bifold",
-    slug: "classic-bifold-wallet",
     name: "Classic Bifold Wallet",
     price: 120,
     category: "wallets",
@@ -35,7 +33,6 @@ export const products: Product[] = [
   },
   {
     id: "heritage-messenger",
-    slug: "heritage-messenger-bag",
     name: "Heritage Messenger Bag",
     price: 395,
     category: "bags",
@@ -49,7 +46,6 @@ export const products: Product[] = [
   },
   {
     id: "artisan-belt",
-    slug: "artisan-dress-belt",
     name: "Artisan Dress Belt",
     price: 85,
     category: "belts",
@@ -63,7 +59,6 @@ export const products: Product[] = [
   },
   {
     id: "leather-keychain",
-    slug: "leather-key-organizer",
     name: "Leather Key Organizer",
     price: 45,
     category: "accessories",
@@ -77,7 +72,6 @@ export const products: Product[] = [
   },
   {
     id: "slim-cardholder",
-    slug: "slim-card-holder",
     name: "Slim Card Holder",
     price: 65,
     category: "wallets",
@@ -91,7 +85,6 @@ export const products: Product[] = [
   },
   {
     id: "weekender-duffle",
-    slug: "weekender-duffle",
     name: "Weekender Duffle",
     price: 550,
     category: "bags",
