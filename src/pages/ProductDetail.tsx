@@ -1,20 +1,52 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Plus, Minus } from "lucide-react";
 import Layout from "@/components/Layout";
-import { getProduct } from "@/data/products";
+import { products as productsApi } from "@/lib/api";
+import type { Product } from "@/lib/api";
 import { useCart } from "@/contexts/CartContext";
 import { toast } from "sonner";
 
 const ProductDetail = () => {
-  const { id } = useParams();
-  const product = getProduct(id || "");
+  const { slug } = useParams<{ slug: string }>();
   const { addItem } = useCart();
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
   const [engrave, setEngrave] = useState(false);
   const [initials, setInitials] = useState("");
   const [selectedImg, setSelectedImg] = useState(0);
+
+  useEffect(() => {
+    if (!slug) return;
+    setLoading(true);
+    productsApi
+      .get(slug)
+      .then((p) => setProduct(p))
+      .catch(() => setProduct(null))
+      .finally(() => setLoading(false));
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <Layout>
+        <section className="py-12 md:py-20 px-4">
+          <div className="container mx-auto">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 animate-pulse">
+              <div className="aspect-square rounded bg-muted" />
+              <div className="space-y-4 pt-8">
+                <div className="h-4 bg-muted rounded w-1/4" />
+                <div className="h-8 bg-muted rounded w-3/4" />
+                <div className="h-6 bg-muted rounded w-1/4" />
+                <div className="h-24 bg-muted rounded" />
+              </div>
+            </div>
+          </div>
+        </section>
+      </Layout>
+    );
+  }
 
   if (!product) {
     return (
@@ -34,6 +66,8 @@ const ProductDetail = () => {
     toast.success(`${product.name} added to cart`);
   };
 
+  const images = product.images?.length ? product.images : ["https://images.unsplash.com/photo-1627123424574-724758594e93?w=800"];
+
   return (
     <Layout>
       <section className="py-12 md:py-20 px-4">
@@ -46,21 +80,23 @@ const ProductDetail = () => {
             {/* Gallery */}
             <motion.div initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.6 }}>
               <div className="overflow-hidden rounded bg-card aspect-square mb-4">
-                <img src={product.images[selectedImg]} alt={product.name} className="w-full h-full object-cover" />
+                <img src={images[selectedImg]} alt={product.name} className="w-full h-full object-cover" />
               </div>
-              <div className="flex gap-3">
-                {product.images.map((img, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setSelectedImg(i)}
-                    className={`w-20 h-20 rounded overflow-hidden border-2 transition-colors ${
-                      selectedImg === i ? "border-accent" : "border-transparent"
-                    }`}
-                  >
-                    <img src={img} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
+              {images.length > 1 && (
+                <div className="flex gap-3">
+                  {images.map((img, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setSelectedImg(i)}
+                      className={`w-20 h-20 rounded overflow-hidden border-2 transition-colors ${
+                        selectedImg === i ? "border-accent" : "border-transparent"
+                      }`}
+                    >
+                      <img src={img} alt="" className="w-full h-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </motion.div>
 
             {/* Details */}
@@ -68,7 +104,11 @@ const ProductDetail = () => {
               <p className="font-body text-xs tracking-widest uppercase text-accent mb-2">{product.category}</p>
               <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">{product.name}</h1>
               <p className="font-display text-2xl font-semibold text-accent mt-4">${product.price}</p>
-              <p className="font-body text-muted-foreground leading-relaxed mt-6">{product.longDescription}</p>
+              <p className="font-body text-muted-foreground leading-relaxed mt-6">{product.description}</p>
+
+              {!product.in_stock && (
+                <p className="mt-4 text-red-500 font-body text-sm">Out of Stock</p>
+              )}
 
               {/* Personalization */}
               {product.personalizable && (
@@ -110,9 +150,10 @@ const ProductDetail = () => {
                 </div>
                 <button
                   onClick={handleAdd}
-                  className="flex-1 bg-primary text-primary-foreground font-body text-sm tracking-widest uppercase py-3 rounded hover:bg-primary/90 transition-colors"
+                  disabled={!product.in_stock}
+                  className="flex-1 bg-primary text-primary-foreground font-body text-sm tracking-widest uppercase py-3 rounded hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Add to Cart
+                  {product.in_stock ? "Add to Cart" : "Out of Stock"}
                 </button>
               </div>
             </motion.div>
