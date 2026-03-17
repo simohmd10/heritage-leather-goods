@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import Layout from "@/components/Layout";
 import ProductCard from "@/components/ProductCard";
-import { products } from "@/data/products";
+import { products as productsApi } from "@/lib/api";
+import type { Product } from "@/lib/api";
 
 const categories = ["all", "wallets", "bags", "belts", "accessories"];
 
@@ -11,8 +12,17 @@ const Shop = () => {
   const [searchParams] = useSearchParams();
   const initialCat = searchParams.get("category") || "all";
   const [active, setActive] = useState(initialCat);
+  const [productList, setProductList] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = active === "all" ? products : products.filter((p) => p.category === active);
+  useEffect(() => {
+    setLoading(true);
+    productsApi
+      .list({ category: active === "all" ? undefined : active })
+      .then((r) => setProductList(r.products))
+      .catch(() => setProductList([]))
+      .finally(() => setLoading(false));
+  }, [active]);
 
   return (
     <Layout>
@@ -37,13 +47,26 @@ const Shop = () => {
             ))}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12">
-            {filtered.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="aspect-square rounded bg-muted" />
+                  <div className="mt-4 h-5 bg-muted rounded w-3/4" />
+                  <div className="mt-2 h-4 bg-muted rounded w-1/2" />
+                  <div className="mt-2 h-4 bg-muted rounded w-1/4" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12">
+              {productList.map((p) => (
+                <ProductCard key={p.id} product={p} />
+              ))}
+            </div>
+          )}
 
-          {filtered.length === 0 && (
+          {!loading && productList.length === 0 && (
             <p className="text-center font-body text-muted-foreground py-20">No products found in this category.</p>
           )}
         </div>

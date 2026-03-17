@@ -65,7 +65,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
   guest_email      TEXT,
   guest_name       TEXT,
   status           TEXT NOT NULL DEFAULT 'pending'
-                   CHECK (status IN ('pending','processing','shipped','delivered','cancelled')),
+                   CHECK (status IN ('pending','confirmed','processing','shipped','delivered','cancelled')),
   subtotal         DECIMAL(10,2) NOT NULL,
   shipping         DECIMAL(10,2) NOT NULL DEFAULT 0,
   tax              DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -300,9 +300,21 @@ ON CONFLICT (slug) DO NOTHING;
 -- ============================================================
 -- HOW TO CREATE THE ADMIN USER
 -- ============================================================
--- 1. Sign up normally via the app with: admin@heritageleather.com
--- 2. Then run this in the SQL Editor:
---    UPDATE public.profiles SET role = 'admin' WHERE email_from_auth = 'admin@heritageleather.com';
--- OR directly:
+-- 1. Sign up normally via the app with your email
+-- 2. Then run this in the SQL Editor (replace with your email):
 --    UPDATE public.profiles SET role = 'admin'
---    WHERE id = (SELECT id FROM auth.users WHERE email = 'admin@heritageleather.com');
+--    WHERE id = (SELECT id FROM auth.users WHERE email = 'your@email.com');
+
+-- ============================================================
+-- MIGRATION: Add 'confirmed' order status (run on existing DBs)
+-- ============================================================
+-- If the orders table was already created without 'confirmed',
+-- run the following to update the constraint:
+--
+-- ALTER TABLE public.orders
+--   DROP CONSTRAINT IF EXISTS orders_status_check;
+--
+-- ALTER TABLE public.orders
+--   ADD CONSTRAINT orders_status_check
+--   CHECK (status IN ('pending','confirmed','processing','shipped','delivered','cancelled'));
+-- ============================================================

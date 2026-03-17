@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowRight, Star } from "lucide-react";
@@ -7,7 +8,8 @@ import bagImg from "@/assets/product-bag.jpg";
 import beltImg from "@/assets/product-belt.jpg";
 import accessoryImg from "@/assets/product-accessory.jpg";
 import ProductCard from "@/components/ProductCard";
-import { getFeatured, getBestSellers } from "@/data/products";
+import { products as productsApi } from "@/lib/api";
+import type { Product } from "@/lib/api";
 import Layout from "@/components/Layout";
 
 const fadeUp = {
@@ -31,8 +33,13 @@ const testimonials = [
 ];
 
 const Index = () => {
-  const featured = getFeatured();
-  const bestSellers = getBestSellers();
+  const [featured, setFeatured] = useState<Product[]>([]);
+  const [bestSellers, setBestSellers] = useState<Product[]>([]);
+
+  useEffect(() => {
+    productsApi.list({ featured: true, limit: 6 }).then((r) => setFeatured(r.products)).catch(() => {});
+    productsApi.list({ bestseller: true, limit: 6 }).then((r) => setBestSellers(r.products)).catch(() => {});
+  }, []);
 
   return (
     <Layout>
@@ -73,19 +80,21 @@ const Index = () => {
       </section>
 
       {/* Featured Products */}
-      <section className="py-20 md:py-28 px-4">
-        <div className="container mx-auto">
-          <motion.div {...fadeUp} className="text-center mb-14">
-            <h2 className="font-display text-3xl md:text-4xl font-semibold text-foreground">Featured Collection</h2>
-            <p className="font-body text-muted-foreground mt-3">Curated pieces that define our craft</p>
-          </motion.div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12">
-            {featured.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
+      {featured.length > 0 && (
+        <section className="py-20 md:py-28 px-4">
+          <div className="container mx-auto">
+            <motion.div {...fadeUp} className="text-center mb-14">
+              <h2 className="font-display text-3xl md:text-4xl font-semibold text-foreground">Featured Collection</h2>
+              <p className="font-body text-muted-foreground mt-3">Curated pieces that define our craft</p>
+            </motion.div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12">
+              {featured.map((p) => (
+                <ProductCard key={p.id} product={p} />
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Categories */}
       <section className="py-20 bg-card px-4">
@@ -116,19 +125,21 @@ const Index = () => {
       </section>
 
       {/* Best Sellers */}
-      <section className="py-20 md:py-28 px-4">
-        <div className="container mx-auto">
-          <motion.div {...fadeUp} className="text-center mb-14">
-            <h2 className="font-display text-3xl md:text-4xl font-semibold text-foreground">Best Sellers</h2>
-            <p className="font-body text-muted-foreground mt-3">Our most loved pieces</p>
-          </motion.div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12">
-            {bestSellers.map((p) => (
-              <ProductCard key={p.id} product={p} />
-            ))}
+      {bestSellers.length > 0 && (
+        <section className="py-20 md:py-28 px-4">
+          <div className="container mx-auto">
+            <motion.div {...fadeUp} className="text-center mb-14">
+              <h2 className="font-display text-3xl md:text-4xl font-semibold text-foreground">Best Sellers</h2>
+              <p className="font-body text-muted-foreground mt-3">Our most loved pieces</p>
+            </motion.div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 lg:gap-12">
+              {bestSellers.map((p) => (
+                <ProductCard key={p.id} product={p} />
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Brand Story */}
       <section className="py-20 bg-card px-4">

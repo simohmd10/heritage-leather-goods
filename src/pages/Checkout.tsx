@@ -121,8 +121,8 @@ export default function Checkout() {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                   {items.map(item => (
                     <div key={`${item.product.id}-${item.engraving}`} className="flex gap-4 bg-card rounded-lg p-4 border border-border">
-                      <Link to={`/product/${item.product.id}`} className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
-                        <img src={item.product.image} alt={item.product.name} className="w-full h-full object-cover" />
+                      <Link to={`/product/${item.product.slug}`} className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0">
+                        <img src={item.product.images?.[0] ?? ''} alt={item.product.name} className="w-full h-full object-cover" />
                       </Link>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-display text-base font-semibold text-foreground">{item.product.name}</h3>
@@ -140,7 +140,7 @@ export default function Checkout() {
                               <Plus className="w-3 h-3" />
                             </button>
                           </div>
-                          <button onClick={() => removeItem(item.product.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                          <button onClick={() => removeItem(item.product.id as number)} className="text-muted-foreground hover:text-destructive transition-colors">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
