@@ -1,3 +1,4 @@
+import { Component, ReactNode } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { Toaster as Sonner } from '@/components/ui/sonner';
@@ -26,6 +27,36 @@ import AdminMessages from './pages/admin/AdminMessages';
 
 const queryClient = new QueryClient();
 
+// ── Error Boundary — prevents a component crash from showing a blank page ─────
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="min-h-screen bg-stone-50 flex items-center justify-center p-6">
+          <div className="bg-white border border-red-200 rounded-2xl p-8 max-w-md w-full text-center shadow-sm">
+            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-red-600 text-2xl font-bold">!</span>
+            </div>
+            <h2 className="text-lg font-bold text-stone-900 mb-2">Something went wrong</h2>
+            <p className="text-sm text-stone-500 mb-4 font-mono bg-stone-50 rounded p-2 text-left break-all">
+              {(this.state.error as Error).message}
+            </p>
+            <button
+              onClick={() => { this.setState({ error: null }); window.location.href = '/admin'; }}
+              className="px-4 py-2 bg-stone-900 text-white text-sm rounded-lg hover:bg-stone-800 transition-colors"
+            >
+              Reload Admin Panel
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -33,6 +64,7 @@ const App = () => (
         <CartProvider>
           <Sonner />
           <BrowserRouter>
+            <ErrorBoundary>
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<Index />} />

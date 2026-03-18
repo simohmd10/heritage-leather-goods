@@ -16,11 +16,13 @@ export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
+  // Redirect to login when auth resolves and user is not admin
+  // Note: location intentionally excluded from deps — we only care about user/loading changes
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) {
-      navigate('/login', { state: { from: location.pathname } });
+      navigate('/login', { replace: true, state: { from: location.pathname } });
     }
-  }, [user, loading, navigate, location]);
+  }, [user, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch pending orders count for badge
   useEffect(() => {
@@ -31,7 +33,19 @@ export default function AdminLayout() {
     return () => clearInterval(interval);
   }, [user]);
 
-  if (loading || !user || user.role !== 'admin') return null;
+  // ── Loading state — show spinner instead of blank white screen ──────────
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-stone-300 border-t-amber-600 rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-stone-400">Loading admin panel...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || user.role !== 'admin') return null;
 
   const handleLogout = () => {
     logout();

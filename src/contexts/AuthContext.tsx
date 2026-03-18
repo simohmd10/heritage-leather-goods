@@ -36,24 +36,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load existing session on mount
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const profile = await fetchProfile(session.user.id, session.user.email!);
-        setUser(profile);
+    let initialised = false;
+
+    // onAuthStateChange fires first (synchronously on some clients) and handles
+    // the initial session — we let it own the loading=false responsibility.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      try {
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.id, session.user.email!);
+          setUser(profile);
+        } else {
+          setUser(null);
+        }
+      } catch {
+        setUser(null);
+      } finally {
+        if (!initialised) {
+          initialised = true;
+          setLoading(false);
+        }
       }
-      setLoading(false);
     });
 
-    // Listen for auth state changes (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const profile = await fetchProfile(session.user.id, session.user.email!);
-        setUser(profile);
-      } else {
+    // Fallback: if onAuthStateChange never fires (some edge cases), resolve via getSession
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (initialised) return; // already handled by onAuthStateChange
+      try {
+        if (session?.user) {
+          const profile = await fetchProfile(session.user.id, session.user.email!);
+          setUser(profile);
+        }
+      } catch {
         setUser(null);
+      } finally {
+        initialised = true;
+        setLoading(false);
       }
-      setLoading(false);
+    }).catch(() => {
+      if (!initialised) { initialised = true; setLoading(false); }
     });
 
     return () => subscription.unsubscribe();
