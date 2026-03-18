@@ -324,14 +324,11 @@ export const admin = {
     // ── Recent orders ────────────────────────────────────────────────────────
     const { data: recentRaw } = await supabase
       .from('orders')
-      .select('*, profiles(name), order_items(*)')
+      .select('*, order_items(*)')
       .order('created_at', { ascending: false })
       .limit(5);
 
-    const recentOrders: Order[] = (recentRaw ?? []).map((o: any) => ({
-      ...formatOrder(o),
-      customer_name: o.profiles?.name,
-    }));
+    const recentOrders: Order[] = (recentRaw ?? []).map((o: any) => formatOrder(o));
 
     // ── Top products ─────────────────────────────────────────────────────────
     const { data: itemsRaw } = await supabase
@@ -383,7 +380,7 @@ export const admin = {
 
     let q = supabase
       .from('orders')
-      .select('*, profiles(name), order_items(*)', { count: 'exact' })
+      .select('*, order_items(*)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, from + limit - 1);
 
@@ -395,7 +392,7 @@ export const admin = {
     if (error) raise(error);
 
     return {
-      orders: (data ?? []).map((o: any) => ({ ...formatOrder(o), customer_name: o.profiles?.name })) as Order[],
+      orders: (data ?? []).map((o: any) => formatOrder(o)) as Order[],
       total: count ?? 0,
       page,
       limit,
