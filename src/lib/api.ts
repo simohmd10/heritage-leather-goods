@@ -193,7 +193,7 @@ export const orders = {
 
     const { data, error } = await supabase
       .from('orders')
-      .select('*, order_items(*)')
+      .select('*, order_items(*), profiles(name)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -205,7 +205,7 @@ export const orders = {
     const field = typeof id === 'string' && id.startsWith('HLG-') ? 'order_number' : 'id';
     const { data, error } = await supabase
       .from('orders')
-      .select('*, order_items(*)')
+      .select('*, order_items(*), profiles(name)')
       .eq(field, id)
       .single();
     if (error) raise(error);
@@ -216,6 +216,7 @@ export const orders = {
 function formatOrder(o: any): Order {
   return {
     ...o,
+    customer_name: o.profiles?.name ?? o.customer_name ?? undefined,
     shipping_address: typeof o.shipping_address === 'string'
       ? JSON.parse(o.shipping_address)
       : o.shipping_address,
@@ -324,7 +325,7 @@ export const admin = {
     // ── Recent orders ────────────────────────────────────────────────────────
     const { data: recentRaw } = await supabase
       .from('orders')
-      .select('*, order_items(*)')
+      .select('*, order_items(*), profiles(name)')
       .order('created_at', { ascending: false })
       .limit(5);
 
@@ -380,7 +381,7 @@ export const admin = {
 
     let q = supabase
       .from('orders')
-      .select('*, order_items(*)', { count: 'exact' })
+      .select('*, order_items(*), profiles(name)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, from + limit - 1);
 
