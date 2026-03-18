@@ -273,14 +273,18 @@ export const admin = {
 
   stats: async (): Promise<AdminStats> => {
     const [
-      { data: ordersData },
-      { data: productsData },
-      { count: customerCount },
+      { data: ordersData,   error: ordersErr   },
+      { data: productsData, error: productsErr  },
+      { count: customerCount, error: customersErr },
     ] = await Promise.all([
       supabase.from('orders').select('total, status, payment_status, created_at'),
       supabase.from('products').select('stock_count'),
       supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'customer'),
     ]);
+
+    if (ordersErr)   raise(ordersErr);
+    if (productsErr) raise(productsErr);
+    if (customersErr) raise(customersErr);
 
     const allOrders = ordersData ?? [];
     const allProducts = productsData ?? [];
