@@ -142,7 +142,7 @@ export default function AdminLayout() {
           </button>
           <span className="font-playfair font-bold text-stone-900">Heritage Admin</span>
           {pendingCount > 0 && (
-            <Link to="/admin/orders" className="relative p-1">
+            <Link to="/admin/orders?status=pending" className="relative p-1" title={`${pendingCount} pending orders`}>
               <Bell className="w-5 h-5 text-stone-600" />
               <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
                 {pendingCount > 9 ? '9+' : pendingCount}

@@ -60,8 +60,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw new Error(error.message);
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Connection timed out — your Supabase project may be paused. Visit supabase.com to resume it.')), 15000)
+    );
+    const attempt = supabase.auth.signInWithPassword({ email, password });
+    const { error } = await Promise.race([attempt, timeout]) as Awaited<typeof attempt>;
+    if (error) {
+      if (error.message.includes('Invalid login credentials'))
+        throw new Error('Invalid email or password. Make sure the admin account exists in Supabase Authentication.');
+      throw new Error(error.message);
+    }
     // User state is updated automatically via onAuthStateChange
   };
 

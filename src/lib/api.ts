@@ -272,14 +272,18 @@ export const admin = {
 
   stats: async (): Promise<AdminStats> => {
     const [
-      { data: ordersData },
-      { data: productsData },
-      { count: customerCount },
+      { data: ordersData,   error: ordersErr   },
+      { data: productsData, error: productsErr  },
+      { count: customerCount, error: customersErr },
     ] = await Promise.all([
       supabase.from('orders').select('total, status, payment_status, created_at'),
       supabase.from('products').select('stock_count'),
       supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'customer'),
     ]);
+
+    if (ordersErr)   raise(ordersErr);
+    if (productsErr) raise(productsErr);
+    if (customersErr) raise(customersErr);
 
     const allOrders = ordersData ?? [];
     const allProducts = productsData ?? [];
@@ -322,11 +326,12 @@ export const admin = {
     }));
 
     // ── Recent orders ────────────────────────────────────────────────────────
-    const { data: recentRaw } = await supabase
+    const { data: recentRaw, error: recentErr } = await supabase
       .from('orders')
       .select('*, order_items(*)')
       .order('created_at', { ascending: false })
       .limit(5);
+    if (recentErr) raise(recentErr);
 
     const recentOrders: Order[] = (recentRaw ?? []).map((o: any) => formatOrder(o));
 
@@ -387,6 +392,11 @@ export const admin = {
     if (params?.status)   q = q.eq('status', params.status);
     if (params?.dateFrom) q = q.gte('created_at', params.dateFrom);
     if (params?.dateTo)   q = q.lte('created_at', params.dateTo + 'T23:59:59');
+    if (params?.search) {
+      q = q.or(
+        `order_number.ilike.%${params.search}%,guest_name.ilike.%${params.search}%,guest_email.ilike.%${params.search}%`
+      );
+    }
 
     const { data, error, count } = await q;
     if (error) raise(error);

@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import {
   DollarSign, ShoppingCart, Package, Users,
   AlertTriangle, Clock, TrendingUp, ArrowRight,
-  CalendarDays, Zap, BarChart2, Bell
+  CalendarDays, Zap, BarChart2, Bell, Database
 } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -73,12 +73,16 @@ function Skeleton({ className = '' }: { className?: string }) {
 export default function AdminDashboard() {
   const [data, setData]       = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [dbError, setDbError] = useState<string | null>(null);
   const [chartPeriod, setChartPeriod] = useState<7 | 30>(30);
 
   useEffect(() => {
     admin.stats()
       .then(setData)
-      .catch(() => toast.error('Failed to load dashboard stats'))
+      .catch((err: Error) => {
+        setDbError(err.message);
+        toast.error('Failed to load dashboard data');
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -100,6 +104,79 @@ export default function AdminDashboard() {
           {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
         <Skeleton className="h-72 w-full" />
+      </div>
+    );
+  }
+
+  // ── Database not set up ────────────────────────────────────────────────────
+  if (dbError) {
+    const isTableMissing = dbError.toLowerCase().includes('relation') ||
+      dbError.toLowerCase().includes('does not exist') ||
+      dbError.toLowerCase().includes('permission') ||
+      dbError.toLowerCase().includes('policy');
+
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] p-6">
+        <div className="bg-white border border-red-200 rounded-2xl p-8 max-w-2xl w-full shadow-sm">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2.5 bg-red-100 rounded-lg">
+              <Database className="w-6 h-6 text-red-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-stone-900">
+                {isTableMissing ? 'Database Schema Not Applied' : 'Database Connection Error'}
+              </h2>
+              <p className="text-sm text-red-600 font-mono mt-0.5">{dbError}</p>
+            </div>
+          </div>
+
+          {isTableMissing ? (
+            <>
+              <p className="text-stone-600 text-sm mb-5">
+                الجداول غير موجودة في قاعدة البيانات. يجب تطبيق الـ Schema أولاً من Supabase SQL Editor.
+              </p>
+              <div className="bg-stone-50 border border-stone-200 rounded-lg p-4 text-sm space-y-3">
+                <p className="font-semibold text-stone-800">خطوات الإعداد:</p>
+                <ol className="list-decimal list-inside space-y-2 text-stone-600">
+                  <li>
+                    افتح{' '}
+                    <span className="font-mono bg-stone-200 px-1 rounded">supabase.com</span>
+                    {' '}→ مشروعك → <strong>SQL Editor</strong>
+                  </li>
+                  <li>
+                    انسخ محتوى ملف{' '}
+                    <span className="font-mono bg-amber-100 text-amber-800 px-1 rounded">supabase/schema.sql</span>
+                    {' '}وشغّله كاملاً
+                  </li>
+                  <li>
+                    بعد التشغيل، أنشئ مستخدم Admin بتشغيل هذا الاستعلام:
+                    <pre className="bg-stone-800 text-green-400 rounded p-3 mt-2 text-xs overflow-x-auto">{`UPDATE public.profiles SET role = 'admin'
+WHERE id = (
+  SELECT id FROM auth.users
+  WHERE email = 'your-email@example.com'
+);`}</pre>
+                  </li>
+                  <li>أعد تحديث الصفحة</li>
+                </ol>
+              </div>
+            </>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-stone-600 text-sm">
+                تحقق من متغيرات البيئة في ملف{' '}
+                <span className="font-mono bg-stone-200 px-1 rounded">.env.local</span>:
+              </p>
+              <pre className="bg-stone-800 text-green-400 rounded p-3 text-xs overflow-x-auto">{`VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key`}</pre>
+              <button
+                onClick={() => { setDbError(null); setLoading(true); admin.stats().then(setData).catch((e: Error) => setDbError(e.message)).finally(() => setLoading(false)); }}
+                className="mt-2 px-4 py-2 bg-stone-900 text-white text-sm rounded-lg hover:bg-stone-800 transition-colors"
+              >
+                إعادة المحاولة
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
