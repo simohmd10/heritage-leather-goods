@@ -34,19 +34,29 @@ const LIMIT = 15;
 
 export default function AdminOrders() {
   const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  const initialStatus = searchParams.get('status') ?? 'all';
 
   const [orders, setOrders]               = useState<Order[]>([]);
   const [total, setTotal]                 = useState(0);
   const [loading, setLoading]             = useState(true);
-  const [statusFilter, setStatusFilter]   = useState(initialStatus);
+  const [statusFilter, setStatusFilter]   = useState(() => new URLSearchParams(location.search).get('status') ?? 'all');
   const [search, setSearch]               = useState('');
   const [dateFrom, setDateFrom]           = useState('');
   const [dateTo, setDateTo]               = useState('');
   const [page, setPage]                   = useState(1);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [exporting, setExporting]         = useState(false);
+
+  // ── Sync status filter when URL changes (e.g. bell click while already on this page)
+  useEffect(() => {
+    const urlStatus = new URLSearchParams(location.search).get('status') ?? 'all';
+    setStatusFilter(prev => {
+      if (prev !== urlStatus) {
+        setPage(1);
+        return urlStatus;
+      }
+      return prev;
+    });
+  }, [location.search]);
 
   const load = async (overrideSearch?: string) => {
     setLoading(true);

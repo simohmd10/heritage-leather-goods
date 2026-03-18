@@ -16,11 +16,13 @@ export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
 
+  // Redirect to login when auth resolves and user is not admin
+  // Note: location intentionally excluded from deps — we only care about user/loading changes
   useEffect(() => {
     if (!loading && (!user || user.role !== 'admin')) {
-      navigate('/login', { state: { from: location.pathname } });
+      navigate('/login', { replace: true, state: { from: location.pathname } });
     }
-  }, [user, loading, navigate, location]);
+  }, [user, loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch pending orders count for badge
   useEffect(() => {
@@ -31,7 +33,19 @@ export default function AdminLayout() {
     return () => clearInterval(interval);
   }, [user]);
 
-  if (loading || !user || user.role !== 'admin') return null;
+  // ── Loading state — show spinner instead of blank white screen ──────────
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-stone-300 border-t-amber-600 rounded-full animate-spin mx-auto" />
+          <p className="text-sm text-stone-400">Loading admin panel...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user || user.role !== 'admin') return null;
 
   const handleLogout = () => {
     logout();
@@ -141,14 +155,18 @@ export default function AdminLayout() {
             {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
           <span className="font-playfair font-bold text-stone-900">Heritage Admin</span>
-          {pendingCount > 0 && (
-            <Link to="/admin/orders?status=pending" className="relative p-1" title={`${pendingCount} pending orders`}>
-              <Bell className="w-5 h-5 text-stone-600" />
-              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
+          <Link
+            to="/admin/orders?status=pending"
+            className="relative p-1.5 rounded-md hover:bg-stone-100 transition-colors"
+            title={pendingCount > 0 ? `${pendingCount} pending orders` : 'Orders'}
+          >
+            <Bell className={`w-5 h-5 ${pendingCount > 0 ? 'text-amber-600' : 'text-stone-400'}`} />
+            {pendingCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold leading-none">
                 {pendingCount > 9 ? '9+' : pendingCount}
               </span>
-            </Link>
-          )}
+            )}
+          </Link>
         </div>
 
         <main className="p-4 md:p-6">
