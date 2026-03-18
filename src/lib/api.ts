@@ -193,7 +193,7 @@ export const orders = {
 
     const { data, error } = await supabase
       .from('orders')
-      .select('*, order_items(*), profiles(name)')
+      .select('*, order_items(*)')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -205,7 +205,7 @@ export const orders = {
     const field = typeof id === 'string' && id.startsWith('HLG-') ? 'order_number' : 'id';
     const { data, error } = await supabase
       .from('orders')
-      .select('*, order_items(*), profiles(name)')
+      .select('*, order_items(*)')
       .eq(field, id)
       .single();
     if (error) raise(error);
@@ -216,7 +216,6 @@ export const orders = {
 function formatOrder(o: any): Order {
   return {
     ...o,
-    customer_name: o.profiles?.name ?? o.customer_name ?? undefined,
     shipping_address: typeof o.shipping_address === 'string'
       ? JSON.parse(o.shipping_address)
       : o.shipping_address,
@@ -327,11 +326,12 @@ export const admin = {
     }));
 
     // ── Recent orders ────────────────────────────────────────────────────────
-    const { data: recentRaw } = await supabase
+    const { data: recentRaw, error: recentErr } = await supabase
       .from('orders')
-      .select('*, order_items(*), profiles(name)')
+      .select('*, order_items(*)')
       .order('created_at', { ascending: false })
       .limit(5);
+    if (recentErr) raise(recentErr);
 
     const recentOrders: Order[] = (recentRaw ?? []).map((o: any) => formatOrder(o));
 
@@ -385,13 +385,18 @@ export const admin = {
 
     let q = supabase
       .from('orders')
-      .select('*, order_items(*), profiles(name)', { count: 'exact' })
+      .select('*, order_items(*)', { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(from, from + limit - 1);
 
     if (params?.status)   q = q.eq('status', params.status);
     if (params?.dateFrom) q = q.gte('created_at', params.dateFrom);
     if (params?.dateTo)   q = q.lte('created_at', params.dateTo + 'T23:59:59');
+    if (params?.search) {
+      q = q.or(
+        `order_number.ilike.%${params.search}%,guest_name.ilike.%${params.search}%,guest_email.ilike.%${params.search}%`
+      );
+    }
 
     const { data, error, count } = await q;
     if (error) raise(error);

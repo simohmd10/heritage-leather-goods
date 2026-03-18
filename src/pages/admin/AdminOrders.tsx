@@ -48,20 +48,21 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [exporting, setExporting]         = useState(false);
 
-  const load = async () => {
+  const load = async (overrideSearch?: string) => {
     setLoading(true);
     try {
       const data = await admin.orders({
         status:   statusFilter !== 'all' ? statusFilter : undefined,
         dateFrom: dateFrom || undefined,
         dateTo:   dateTo   || undefined,
+        search:   (overrideSearch ?? search) || undefined,
         page,
         limit: LIMIT,
       });
       setOrders(data.orders);
       setTotal(data.total);
-    } catch {
-      toast.error('Failed to load orders');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to load orders');
     } finally {
       setLoading(false);
     }
@@ -107,6 +108,12 @@ export default function AdminOrders() {
     }
   };
 
+  // Debounced search — triggers server-side reload
+  useEffect(() => {
+    const timer = setTimeout(() => { setPage(1); load(search); }, 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
   const clearFilters = () => {
     setStatusFilter('all');
     setDateFrom('');
@@ -117,18 +124,19 @@ export default function AdminOrders() {
 
   const hasActiveFilters = statusFilter !== 'all' || dateFrom || dateTo || search;
 
-  // Client-side search on name / order number / phone
-  const filtered = orders.filter(o => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      o.order_number.toLowerCase().includes(q) ||
-      (o.customer_name ?? '').toLowerCase().includes(q) ||
-      (o.guest_name   ?? '').toLowerCase().includes(q) ||
-      (o.guest_email  ?? '').toLowerCase().includes(q) ||
-      (o.shipping_address?.phone ?? '').includes(q)
-    );
-  });
+  // Results come from server — phone search still done client-side (not in DB query)
+  const filtered = search
+    ? orders.filter(o => {
+        const q = search.toLowerCase();
+        return (
+          o.order_number.toLowerCase().includes(q) ||
+          (o.customer_name ?? '').toLowerCase().includes(q) ||
+          (o.guest_name   ?? '').toLowerCase().includes(q) ||
+          (o.guest_email  ?? '').toLowerCase().includes(q) ||
+          (o.shipping_address?.phone ?? '').includes(q)
+        );
+      })
+    : orders;
 
   const totalPages = Math.ceil(total / LIMIT);
 
@@ -141,7 +149,7 @@ export default function AdminOrders() {
           <p className="text-stone-500 text-sm">{total} total orders</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => { setPage(1); load(); }} className="gap-2">
+          <Button variant="outline" onClick={() => { setPage(1); load(search); }} className="gap-2">
             <RefreshCw className="w-4 h-4" />
             Refresh
           </Button>
