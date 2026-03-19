@@ -17,8 +17,8 @@ async function fetchProfile(userId: string, email: string): Promise<User | null>
   const query = supabase.from('profiles').select('*').eq('id', userId).single();
   const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), 6000));
   const result = await Promise.race([query, timeout]);
-  if (!result || 'error' in result) return null;
-  const { data, error } = result as Awaited<typeof query>;
+  if (result === null) return null; // timed out
+  const { data, error } = result;
   if (error || !data) return null;
   return {
     id: userId,
