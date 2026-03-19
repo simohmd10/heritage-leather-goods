@@ -96,9 +96,6 @@ export default function Login() {
             </p>
           </div>
 
-          <div className="mt-4 p-3 bg-stone-50 rounded-lg text-xs text-stone-500 text-center">
-            <strong>Demo:</strong> admin@artisanleather.com / Admin@123456
-          </div>
         </div>
       </div>
     </div>
