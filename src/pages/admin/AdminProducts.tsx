@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from 'react';
-import { admin, Product } from '@/lib/api';
+import { useEffect, useState, useMemo, useRef } from 'react';
+import { admin, uploadProductImage, Product } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, Search, Package, Star, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Plus, Pencil, Trash2, Search, Package, Star, TrendingUp, AlertTriangle, Camera, ImageIcon, Link2, X, Upload } from 'lucide-react';
 
 const CATEGORIES = ['wallets', 'bags', 'belts', 'accessories'] as const;
 
@@ -23,7 +23,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 const EMPTY_FORM = {
   slug: '', name: '', description: '', price: '', category: 'wallets',
   stock_count: '100', featured: false, bestseller: false, personalizable: false,
-  images: ''
+  images: [] as string[]
 };
 
 export default function AdminProducts() {
@@ -36,6 +36,12 @@ export default function AdminProducts() {
   const [deleteId, setDeleteId]           = useState<number | null>(null);
   const [form, setForm]                   = useState(EMPTY_FORM);
   const [saving, setSaving]               = useState(false);
+  const [imagePickerOpen, setImagePickerOpen] = useState(false);
+  const [urlInput, setUrlInput]           = useState('');
+  const [urlMode, setUrlMode]             = useState(false);
+  const [uploadingImg, setUploadingImg]   = useState(false);
+  const cameraRef  = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     setLoading(true);
@@ -78,7 +84,7 @@ export default function AdminProducts() {
       price: String(p.price), category: p.category,
       stock_count: String(p.stock_count),
       featured: p.featured, bestseller: p.bestseller, personalizable: p.personalizable,
-      images: p.images.join('\n')
+      images: p.images
     });
     setDialogOpen(true);
   };
@@ -100,7 +106,7 @@ export default function AdminProducts() {
         featured: form.featured,
         bestseller: form.bestseller,
         personalizable: form.personalizable,
-        images: form.images.split('\n').map(s => s.trim()).filter(Boolean),
+        images: form.images,
         in_stock: (parseInt(form.stock_count) || 100) > 0,
       };
 
@@ -136,6 +142,35 @@ export default function AdminProducts() {
 
   const setField = (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(prev => ({ ...prev, [field]: e.target.value }));
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImg(true);
+    setImagePickerOpen(false);
+    try {
+      const url = await uploadProductImage(file);
+      setForm(prev => ({ ...prev, images: [...prev.images, url] }));
+      toast.success('Image uploaded');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setUploadingImg(false);
+      e.target.value = '';
+    }
+  };
+
+  const addUrlImage = () => {
+    const url = urlInput.trim();
+    if (!url) return;
+    setForm(prev => ({ ...prev, images: [...prev.images, url] }));
+    setUrlInput('');
+    setUrlMode(false);
+    setImagePickerOpen(false);
+  };
+
+  const removeImage = (idx: number) =>
+    setForm(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== idx) }));
 
   return (
     <div className="space-y-5">
@@ -281,7 +316,7 @@ export default function AdminProducts() {
       </div>
 
       {/* ── Create / Edit Dialog ─────────────────────────────────────────────── */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={v => { setDialogOpen(v); if (!v) { setImagePickerOpen(false); setUrlMode(false); setUrlInput(''); } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
@@ -326,15 +361,126 @@ export default function AdminProducts() {
               />
             </div>
 
+            {/* ── Image Picker ───────────────────────────────────────────── */}
             <div>
-              <Label>Image URLs <span className="text-stone-400 font-normal">(one per line)</span></Label>
-              <textarea
-                value={form.images}
-                onChange={e => setForm(p => ({ ...p, images: e.target.value }))}
-                rows={3}
-                className="mt-1.5 w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring resize-none"
-                placeholder="https://example.com/image1.jpg"
-              />
+              <Label>Product Images</Label>
+
+              {/* Hidden file inputs */}
+              <input ref={cameraRef}  type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileSelected} />
+              <input ref={galleryRef} type="file" accept="image/*"                       className="hidden" onChange={handleFileSelected} />
+
+              {/* Image previews */}
+              {form.images.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {form.images.map((url, i) => (
+                    <div key={i} className="relative group w-20 h-20 shrink-0">
+                      <img src={url} alt="" className="w-full h-full object-cover rounded-lg border border-stone-200" />
+                      <button
+                        type="button"
+                        onClick={() => removeImage(i)}
+                        className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                      {i === 0 && (
+                        <span className="absolute bottom-1 left-1 text-[10px] bg-black/60 text-white px-1 rounded">Main</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add image button */}
+              <button
+                type="button"
+                onClick={() => { setUrlMode(false); setImagePickerOpen(true); }}
+                disabled={uploadingImg}
+                className="mt-2 w-full border-2 border-dashed border-stone-300 rounded-xl py-4 flex flex-col items-center gap-1.5 text-stone-400 hover:border-stone-400 hover:text-stone-600 transition-colors disabled:opacity-50"
+              >
+                {uploadingImg ? (
+                  <>
+                    <Upload className="w-5 h-5 animate-bounce" />
+                    <span className="text-sm">Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-5 h-5" />
+                    <span className="text-sm">Add Image</span>
+                  </>
+                )}
+              </button>
+
+              {/* Image source picker sheet */}
+              {imagePickerOpen && (
+                <div className="fixed inset-0 z-50 flex items-end" onClick={() => { setImagePickerOpen(false); setUrlMode(false); }}>
+                  <div className="absolute inset-0 bg-black/40" />
+                  <div className="relative w-full bg-white rounded-t-2xl p-5 space-y-2 shadow-xl" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-stone-900">Choose Image Source</h3>
+                      <button onClick={() => { setImagePickerOpen(false); setUrlMode(false); }} className="text-stone-400 hover:text-stone-600">
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    {urlMode ? (
+                      <div className="space-y-3">
+                        <Input
+                          autoFocus
+                          value={urlInput}
+                          onChange={e => setUrlInput(e.target.value)}
+                          placeholder="https://example.com/image.jpg"
+                          onKeyDown={e => e.key === 'Enter' && addUrlImage()}
+                        />
+                        <div className="flex gap-2">
+                          <Button variant="outline" className="flex-1" onClick={() => setUrlMode(false)}>Back</Button>
+                          <Button className="flex-1 bg-stone-900 hover:bg-stone-800" onClick={addUrlImage}>Add</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => { cameraRef.current?.click(); }}
+                          className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-stone-50 transition-colors text-left"
+                        >
+                          <div className="w-11 h-11 bg-pink-100 rounded-full flex items-center justify-center shrink-0">
+                            <Camera className="w-5 h-5 text-pink-500" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-stone-900">Take a Photo</p>
+                            <p className="text-sm text-stone-400">Open camera to capture</p>
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={() => { galleryRef.current?.click(); }}
+                          className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-stone-50 transition-colors text-left"
+                        >
+                          <div className="w-11 h-11 bg-purple-100 rounded-full flex items-center justify-center shrink-0">
+                            <ImageIcon className="w-5 h-5 text-purple-500" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-stone-900">Choose from Gallery</p>
+                            <p className="text-sm text-stone-400">Pick from your photos</p>
+                          </div>
+                        </button>
+
+                        <button
+                          onClick={() => setUrlMode(true)}
+                          className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-stone-50 transition-colors text-left"
+                        >
+                          <div className="w-11 h-11 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                            <Link2 className="w-5 h-5 text-blue-500" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-stone-900">Use Image URL</p>
+                            <p className="text-sm text-stone-400">Paste a link to an image</p>
+                          </div>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="border rounded-lg p-3 space-y-3">
