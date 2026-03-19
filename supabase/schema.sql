@@ -303,7 +303,7 @@ ON CONFLICT (slug) DO NOTHING;
 -- 1. Sign up normally via the app with your email
 -- 2. Then run this in the SQL Editor (replace with your email):
 --    UPDATE public.profiles SET role = 'admin'
---    WHERE id = (SELECT id FROM auth.users WHERE email = 'your@email.com');
+--    WHERE id = (SELECT id FROM auth.users WHERE email = 'halimsimo0987@gmail.com');
 
 -- ============================================================
 -- MIGRATION: Add 'confirmed' order status (run on existing DBs)
