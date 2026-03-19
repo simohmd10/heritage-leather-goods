@@ -11,6 +11,7 @@ const categories = ["all", "wallets", "bags", "belts", "accessories"];
 const Shop = () => {
   const [searchParams] = useSearchParams();
   const initialCat = searchParams.get("category") || "all";
+  const searchQuery = searchParams.get("search") || "";
   const [active, setActive] = useState(initialCat);
   const [productList, setProductList] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,18 +20,33 @@ const Shop = () => {
     setLoading(true);
     productsApi
       .list({ category: active === "all" ? undefined : active })
-      .then((r) => setProductList(r.products))
+      .then((r) => {
+        let results = r.products;
+        if (searchQuery) {
+          const q = searchQuery.toLowerCase();
+          results = results.filter(
+            (p) =>
+              p.name?.toLowerCase().includes(q) ||
+              p.description?.toLowerCase().includes(q)
+          );
+        }
+        setProductList(results);
+      })
       .catch(() => setProductList([]))
       .finally(() => setLoading(false));
-  }, [active]);
+  }, [active, searchQuery]);
 
   return (
     <Layout>
       <section className="py-16 md:py-24 px-4">
         <div className="container mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
-            <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground">Shop</h1>
-            <p className="font-body text-muted-foreground mt-3">Browse our complete collection</p>
+            <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground">
+              {searchQuery ? `Results for "${searchQuery}"` : "Shop"}
+            </h1>
+            <p className="font-body text-muted-foreground mt-3">
+              {searchQuery ? `${productList.length} product(s) found` : "Browse our complete collection"}
+            </p>
           </motion.div>
 
           <div className="flex justify-center gap-3 flex-wrap mb-12">
@@ -67,7 +83,9 @@ const Shop = () => {
           )}
 
           {!loading && productList.length === 0 && (
-            <p className="text-center font-body text-muted-foreground py-20">No products found in this category.</p>
+            <p className="text-center font-body text-muted-foreground py-20">
+              {searchQuery ? `No products found for "${searchQuery}".` : "No products found in this category."}
+            </p>
           )}
         </div>
       </section>
