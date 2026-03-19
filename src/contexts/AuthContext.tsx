@@ -14,12 +14,11 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 async function fetchProfile(userId: string, email: string): Promise<User | null> {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
-
+  const query = supabase.from('profiles').select('*').eq('id', userId).single();
+  const timeout = new Promise<null>(resolve => setTimeout(() => resolve(null), 6000));
+  const result = await Promise.race([query, timeout]);
+  if (!result || 'error' in result) return null;
+  const { data, error } = result as Awaited<typeof query>;
   if (error || !data) return null;
   return {
     id: userId,
@@ -38,45 +37,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let initialised = false;
 
-    // onAuthStateChange fires first (synchronously on some clients) and handles
-    // the initial session — we let it own the loading=false responsibility.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const done = () => {
+      if (!initialised) { initialised = true; clearTimeout(hardTimer); setLoading(false); }
+    };
+
+    // Hard fallback: if nothing resolves in 10s (wrong env vars / deleted project),
+    // stop the loading spinner so the user isn't stuck forever.
+    const hardTimer = setTimeout(() => {
+      if (!initialised) { initialised = true; setUser(null); setLoading(false); }
+    }, 10000);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       try {
-        if (session?.user) {
-          const profile = await fetchProfile(session.user.id, session.user.email!);
-          setUser(profile);
-        } else {
-          setUser(null);
-        }
+        setUser(session?.user ? await fetchProfile(session.user.id, session.user.email!) : null);
       } catch {
         setUser(null);
       } finally {
-        if (!initialised) {
-          initialised = true;
-          setLoading(false);
-        }
+        done();
       }
     });
 
-    // Fallback: if onAuthStateChange never fires (some edge cases), resolve via getSession
+    // Fallback: if onAuthStateChange never fires resolve via getSession
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (initialised) return; // already handled by onAuthStateChange
+      if (initialised) return;
       try {
-        if (session?.user) {
-          const profile = await fetchProfile(session.user.id, session.user.email!);
-          setUser(profile);
-        }
+        if (session?.user) setUser(await fetchProfile(session.user.id, session.user.email!));
       } catch {
         setUser(null);
       } finally {
-        initialised = true;
-        setLoading(false);
+        done();
       }
-    }).catch(() => {
-      if (!initialised) { initialised = true; setLoading(false); }
-    });
+    }).catch(() => done());
 
-    return () => subscription.unsubscribe();
+    return () => { subscription.unsubscribe(); clearTimeout(hardTimer); };
   }, []);
 
   const login = async (email: string, password: string) => {
