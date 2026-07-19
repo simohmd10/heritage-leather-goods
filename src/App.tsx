@@ -18,16 +18,8 @@ import Register from './pages/Register';
 import Account from './pages/Account';
 import NotFound from './pages/NotFound';
 
-import AdminLayout from './pages/admin/AdminLayout';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminProducts from './pages/admin/AdminProducts';
-import AdminOrders from './pages/admin/AdminOrders';
-import AdminCustomers from './pages/admin/AdminCustomers';
-import AdminMessages from './pages/admin/AdminMessages';
-
 const queryClient = new QueryClient();
 
-// ── Error Boundary — prevents a component crash from showing a blank page ─────
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null };
   static getDerivedStateFromError(error: Error) { return { error }; }
@@ -44,10 +36,10 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
               {(this.state.error as Error).message}
             </p>
             <button
-              onClick={() => { this.setState({ error: null }); window.location.href = '/admin'; }}
+              onClick={() => { this.setState({ error: null }); window.location.href = '/'; }}
               className="px-4 py-2 bg-stone-900 text-white text-sm rounded-lg hover:bg-stone-800 transition-colors"
             >
-              Reload Admin Panel
+              Reload Page
             </button>
           </div>
         </div>
@@ -65,30 +57,19 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <ErrorBoundary>
-            <Routes>
-              {/* Public routes */}
-              <Route path="/" element={<Index />} />
-              <Route path="/shop" element={<Shop />} />
-              <Route path="/product/:slug" element={<ProductDetail />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/order-success" element={<OrderSuccess />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/account" element={<Account />} />
-
-              {/* Admin routes */}
-              <Route path="/admin" element={<AdminLayout />}>
-                <Route index element={<AdminDashboard />} />
-                <Route path="products" element={<AdminProducts />} />
-                <Route path="orders" element={<AdminOrders />} />
-                <Route path="customers" element={<AdminCustomers />} />
-                <Route path="messages" element={<AdminMessages />} />
-              </Route>
-
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/shop" element={<Shop />} />
+                <Route path="/product/:slug" element={<ProductDetail />} />
+                <Route path="/about" element={<About />} />
+                <Route path="/contact" element={<Contact />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route path="/order-success" element={<OrderSuccess />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/account" element={<Account />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
             </ErrorBoundary>
           </BrowserRouter>
         </CartProvider>
