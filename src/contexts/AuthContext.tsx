@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await Promise.race([attempt, timeout]) as Awaited<typeof attempt>;
     if (error) {
       if (error.message.includes('Invalid login credentials'))
-        throw new Error('Invalid email or password. Make sure the admin account exists in Supabase Authentication.');
+        throw new Error('Invalid email or password. Please check your credentials and try again.');
       throw new Error(error.message);
     }
     // User state is updated automatically via onAuthStateChange
